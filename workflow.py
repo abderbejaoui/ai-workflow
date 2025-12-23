@@ -16,7 +16,7 @@ from nodes import (
     schema_feasibility_node,
     sql_generator_node,
     sql_validator_node,
-    databricks_executor_node,
+    casino_api_executor_node,
     result_summarizer_node,
 )
 
@@ -79,14 +79,14 @@ def route_from_validator(state: WorkflowState) -> str:
     """
     Route from SQL validator.
     
-    - If valid → databricks_executor
+    - If valid → casino_api_executor
     - If invalid → fallback
     """
     validation_result = state.get("validation_result", {})
     is_valid = validation_result.get("valid", False)
     
     if is_valid:
-        next_node = "databricks_executor"
+        next_node = "casino_api_executor"
         reason = "SQL is valid"
     else:
         next_node = "fallback"
@@ -99,7 +99,7 @@ def route_from_validator(state: WorkflowState) -> str:
 
 def route_from_executor(state: WorkflowState) -> str:
     """
-    Route from Databricks executor.
+    Route from Casino API executor.
     
     - If successful (no error) → result_summarizer
     - If error → fallback
@@ -113,7 +113,7 @@ def route_from_executor(state: WorkflowState) -> str:
         next_node = "result_summarizer"
         reason = "query executed successfully"
     
-    log_routing_decision(logger, "databricks_executor", next_node, reason)
+    log_routing_decision(logger, "casino_api_executor", next_node, reason)
     return next_node
 
 
@@ -147,7 +147,7 @@ def build_workflow() -> StateGraph:
     workflow.add_node("schema_feasibility", schema_feasibility_node)
     workflow.add_node("sql_generator", sql_generator_node)
     workflow.add_node("sql_validator", sql_validator_node)
-    workflow.add_node("databricks_executor", databricks_executor_node)
+    workflow.add_node("casino_api_executor", casino_api_executor_node)
     workflow.add_node("result_summarizer", result_summarizer_node)
     
     # Set entry point
@@ -184,13 +184,13 @@ def build_workflow() -> StateGraph:
         "sql_validator",
         route_from_validator,
         {
-            "databricks_executor": "databricks_executor",
+            "casino_api_executor": "casino_api_executor",
             "fallback": "fallback",
         }
     )
     
     workflow.add_conditional_edges(
-        "databricks_executor",
+        "casino_api_executor",
         route_from_executor,
         {
             "result_summarizer": "result_summarizer",

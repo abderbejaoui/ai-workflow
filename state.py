@@ -72,8 +72,20 @@ class SchemaTable:
     
     @property
     def full_name(self) -> str:
-        """Returns fully qualified table name."""
-        return f"{self.catalog}.{self.schema}.{self.table}"
+        """
+        Returns fully qualified table name.
+        
+        For PostgreSQL/Supabase with schema prefixes, we use schema.table format.
+        For Databricks with Unity Catalog, we use catalog.schema.table format.
+        
+        If catalog and schema are the same, we only use schema.table to avoid duplication.
+        """
+        if self.catalog == self.schema:
+            # Schema-based naming (e.g., hr_casino.employees)
+            return f"{self.schema}.{self.table}"
+        else:
+            # Full catalog.schema.table naming
+            return f"{self.catalog}.{self.schema}.{self.table}"
 
 
 @dataclass

@@ -8,7 +8,7 @@ from nodes.fallback import FallbackClarifier, fallback_node
 from nodes.schema_feasibility import SchemaFeasibilityChecker, schema_feasibility_node
 from nodes.sql_generator import SQLGenerator, sql_generator_node
 from nodes.sql_validator import SQLValidator, sql_validator_node
-from nodes.databricks_executor import DatabricksExecutor, databricks_executor_node
+from nodes.casino_api_executor import CasinoAPIExecutor, casino_api_executor_node
 from nodes.result_summarizer import ResultSummarizer, result_summarizer_node
 
 __all__ = [
@@ -24,8 +24,8 @@ __all__ = [
     "sql_generator_node",
     "SQLValidator",
     "sql_validator_node",
-    "DatabricksExecutor",
-    "databricks_executor_node",
+    "CasinoAPIExecutor",
+    "casino_api_executor_node",
     "ResultSummarizer",
     "result_summarizer_node",
 ]

@@ -60,7 +60,7 @@ class SQLGenerator:
                 'execution_time': execution_time
             }
         )
-        self.logger.debug(f"Full SQL: {sql}")
+        self.logger.info(f"Generated SQL: {sql}")
         
         updates = {
             "generated_sql": sql,
@@ -82,24 +82,58 @@ class SQLGenerator:
         candidate_tables = feasibility_check.get("tables", [])
         schema_subset = self._get_relevant_schema(candidate_tables, schema_cache)
         
-        system_prompt = """You are an expert SQL generator for Databricks.
+        system_prompt = """You are an expert SQL generator for PostgreSQL/Supabase specializing in analytical queries.
 
 Generate a SQL query following these STRICT rules:
 
 1. NO SELECT * - Always specify explicit column names
-2. Use fully qualified table names (catalog.schema.table)
+2. Use FULLY QUALIFIED table names (schema.table_name format):
+   - hr_casino.employees for employee data
+   - marketing_casino.customers for customer data
+   - marketing_casino.customer_behaviors for customer behavior data
+   - operations_casino.game_sessions for game session data
+   - operations_casino.gaming_equipment for gaming equipment data
+   - operations_casino.shifts for shift data
+   - finance_casino.transactions for transaction data
 3. ALWAYS include LIMIT clause (default 100, max 1000)
 4. Use proper JOIN syntax if multiple tables
 5. Add WHERE clauses for filtering
 6. Only read operations (SELECT) - no DDL/DML
 
-Output format:
-```sql
-SELECT column1, column2
-FROM catalog.schema.table
-WHERE condition
-LIMIT 100
-```
+CRITICAL - Understand query intent:
+- "per X" or "average per X" → Use GROUP BY and AVG() or SUM()/COUNT()
+- "highest/lowest/top/bottom" → Use ORDER BY with proper aggregation
+- "total" → Use SUM()
+- "count" or "number of" → Use COUNT()
+- "each X" → Use GROUP BY X
+- Time periods ("last month", "last year") → Use WHERE with date comparisons
+
+AGGREGATION EXAMPLES:
+
+Q: "Which employees generated the highest revenue per shift?"
+A: SELECT e.employee_id, e.first_name, e.last_name, 
+          COUNT(s.shift_id) as total_shifts,
+          AVG(s.total_revenue) as avg_revenue_per_shift
+   FROM hr_casino.employees e
+   JOIN operations_casino.shifts s ON e.employee_id = s.employee_id
+   GROUP BY e.employee_id, e.first_name, e.last_name
+   ORDER BY avg_revenue_per_shift DESC
+   LIMIT 10;
+
+Q: "How many customers from each region?"
+A: SELECT region, COUNT(customer_id) as customer_count
+   FROM marketing_casino.customers
+   GROUP BY region
+   ORDER BY customer_count DESC
+   LIMIT 100;
+
+Q: "Total transactions per customer"
+A: SELECT customer_id, COUNT(transaction_id) as total_transactions, 
+          SUM(transaction_amount) as total_amount
+   FROM finance_casino.transactions
+   GROUP BY customer_id
+   ORDER BY total_amount DESC
+   LIMIT 100;
 
 Return ONLY the SQL query, nothing else."""
         

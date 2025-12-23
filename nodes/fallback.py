@@ -12,6 +12,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from state import WorkflowState
 from utils import get_main_llm, format_conversation_history, truncate_history
 from config import config
+from logging_config import get_logger, log_node_entry, log_node_exit
 
 
 class FallbackClarifier:
@@ -24,6 +25,7 @@ class FallbackClarifier:
     
     def __init__(self):
         self.llm = get_main_llm()
+        self.logger = get_logger("ai_workflow.fallback")
     
     def __call__(self, state: WorkflowState) -> Dict[str, Any]:
         """
@@ -35,6 +37,8 @@ class FallbackClarifier:
         Returns:
             Updated state with clarification response
         """
+        log_node_entry(self.logger, "FallbackClarifier", state)
+        
         user_input = state.get("user_input", "")
         conversation_history = state.get("conversation_history", [])
         schema_cache = state.get("schema_cache", {})
@@ -42,6 +46,10 @@ class FallbackClarifier:
         
         # Determine why we're in fallback
         reason = self._determine_fallback_reason(state)
+        self.logger.info(f"Fallback triggered - reason: {reason}")
+        
+        if error_message:
+            self.logger.warning(f"Error that triggered fallback: {error_message}")
         
         # Generate appropriate response
         response = self._generate_clarification(
@@ -52,10 +60,13 @@ class FallbackClarifier:
             history=truncate_history(conversation_history, max_messages=2)
         )
         
-        return {
+        updates = {
             "response": response,
             "current_node": "fallback"
         }
+        
+        log_node_exit(self.logger, "FallbackClarifier", updates)
+        return updates
     
     def _determine_fallback_reason(self, state: WorkflowState) -> str:
         """Determine why we ended up in fallback state."""

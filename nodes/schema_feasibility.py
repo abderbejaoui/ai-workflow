@@ -12,7 +12,9 @@ from typing import Dict, Any, List, Optional
 from langchain_core.messages import SystemMessage, HumanMessage
 from state import WorkflowState, SchemaTable
 from utils import get_main_llm, extract_json_from_text
+from logging_config import get_logger, log_node_entry, log_node_exit
 import json
+import time
 
 
 class SchemaFeasibilityChecker:
@@ -27,6 +29,7 @@ class SchemaFeasibilityChecker:
     
     def __init__(self):
         self.llm = get_main_llm()
+        self.logger = get_logger("ai_workflow.schema_feasibility")
     
     def __call__(self, state: WorkflowState) -> Dict[str, Any]:
         """
@@ -38,16 +41,35 @@ class SchemaFeasibilityChecker:
         Returns:
             Updated state with feasibility check results
         """
+        log_node_entry(self.logger, "SchemaFeasibilityChecker", state)
+        start_time = time.time()
+        
         user_input = state.get("user_input", "")
         schema_cache = state.get("schema_cache", {})
+        
+        self.logger.info(f"Checking feasibility for query: '{user_input[:100]}...'")
         
         # Perform feasibility check
         result = self._check_feasibility(user_input, schema_cache)
         
-        return {
+        execution_time = time.time() - start_time
+        
+        if result.get("feasible"):
+            self.logger.info(
+                f"✓ Query is feasible (tables: {result.get('tables', [])}) in {execution_time:.3f}s"
+            )
+        else:
+            self.logger.warning(
+                f"✗ Query not feasible: {result.get('reason', 'Unknown')} in {execution_time:.3f}s"
+            )
+        
+        updates = {
             "feasibility_check": result,
             "current_node": "schema_feasibility"
         }
+        
+        log_node_exit(self.logger, "SchemaFeasibilityChecker", updates)
+        return updates
     
     def _check_feasibility(
         self, 

@@ -32,6 +32,10 @@ class Config:
     DATABRICKS_ACCESS_TOKEN: str = os.getenv("DATABRICKS_ACCESS_TOKEN", "")
     DATABRICKS_QUERY_TIMEOUT: int = int(os.getenv("DATABRICKS_QUERY_TIMEOUT", "2"))
     
+    # Casino API Configuration (replaces Databricks)
+    CASINO_API_URL: str = os.getenv("CASINO_API_URL", "http://44.251.222.149:8000/api/sql/execute-query")
+    QUERY_TIMEOUT: int = int(os.getenv("QUERY_TIMEOUT", "5"))
+    
     # Performance and Limits
     MAX_RESULT_ROWS: int = int(os.getenv("MAX_RESULT_ROWS", "1000"))
     CONVERSATION_HISTORY_LIMIT: int = int(os.getenv("CONVERSATION_HISTORY_LIMIT", "5"))

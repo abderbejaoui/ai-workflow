@@ -19,6 +19,7 @@ from utils import (
     extract_json_from_text,
     format_schema_for_prompt
 )
+from casino_schema import get_casino_schema_description
 from logging_config import get_logger, log_node_entry, log_node_exit, log_llm_call
 import json
 import time
@@ -121,12 +122,21 @@ class SupervisorNode:
         
         Returns intent and confidence score.
         """
-        system_prompt = """You are an intent classifier for a data analytics system.
+        system_prompt = """You are an intent classifier for a casino data analytics system.
 
 Your job: Analyze the user's request and classify it into ONE of three categories:
 
-1. **databricks** - User wants to query data, run analytics, or get insights from tables
-   Examples: "Show me sales data", "What's the average price?", "List all customers"
+1. **databricks** - User wants to query casino data, run analytics, or get insights from tables
+   Examples: "Show me customer data", "What's the total revenue?", "List high-risk customers"
+   
+   Available Casino Tables:
+   - customers (7,678 records) - Customer profiles, demographics, risk scores
+   - customer_behaviors (1,993 records) - Gambling patterns, problem gambling indicators
+   - transactions (586,781 records) - Payment transactions, deposits, withdrawals
+   - game_sessions (3,000 records) - Gaming sessions, bets, wins, duration
+   - gaming_equipment (20 records) - Tables, machines, equipment status
+   - shifts (100 records) - Employee shifts, performance metrics
+   - employees (50 records) - Staff directory, departments, salaries
 
 2. **conversation** - General chat, greetings, system questions (not about data)
    Examples: "Hello", "How are you?", "What can you do?", "Thank you"

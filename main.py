@@ -60,17 +60,11 @@ class AIWorkflowOrchestrator:
             self.logger.info("✓ Mock schema loaded")
             print("✓ Mock schema loaded")
         else:
-            try:
-                # Try loading from Databricks
-                self.schema_loader.load_from_databricks()
-                self.logger.info("✓ Schema loaded from Databricks")
-                print("✓ Schema loaded from Databricks")
-            except Exception as e:
-                self.logger.warning(f"Could not load from Databricks: {e}")
-                self.logger.info("Using mock schema for demo")
-                print(f"⚠ Could not load from Databricks: {e}")
-                print("  Using mock schema for demo")
-                self.schema_loader.load_mock_schema()
+            # Load casino schema by default
+            self.schema_loader.load_casino_schema()
+            self.logger.info("✓ Casino database schema loaded (7 tables, 600K+ records)")
+            print("✓ Casino database schema loaded")
+            print("  Tables: customers, customer_behaviors, transactions, game_sessions, gaming_equipment, shifts, employees")
     
     def query(
         self,
@@ -153,7 +147,10 @@ class AIWorkflowOrchestrator:
                 print(f"\nIntent: {intent} (confidence: {confidence:.2f})")
                 print(f"Path: {current_node}")
                 if sql:
-                    print(f"SQL: {sql}")
+                    print(f"\n{'='*60}")
+                    print(f"SQL Query:")
+                    print(f"{sql}")
+                    print(f"{'='*60}")
                 print(f"Execution time: {execution_time:.3f}s")
                 print(f"\nResponse: {response}")
                 print(f"{'='*60}\n")

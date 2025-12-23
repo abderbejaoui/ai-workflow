@@ -9,6 +9,8 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from state import WorkflowState
 from utils import get_main_llm, format_query_result
 from config import config
+from logging_config import get_logger, log_node_entry, log_node_exit
+import time
 
 
 class ResultSummarizer:
@@ -21,6 +23,7 @@ class ResultSummarizer:
     
     def __init__(self):
         self.llm = get_main_llm()
+        self.logger = get_logger("ai_workflow.result_summarizer")
     
     def __call__(self, state: WorkflowState) -> Dict[str, Any]:
         """
@@ -32,17 +35,43 @@ class ResultSummarizer:
         Returns:
             Updated state with final response
         """
+        log_node_entry(self.logger, "ResultSummarizer", state)
+        start_time = time.time()
+        
         user_input = state.get("user_input", "")
         query_result = state.get("query_result", [])
         generated_sql = state.get("generated_sql", "")
         
+        row_count = len(query_result) if query_result else 0
+        self.logger.info(f"Summarizing {row_count} rows for user")
+        
+        # Log the actual results for debugging
+        if query_result:
+            self.logger.info("="*70)
+            self.logger.info("QUERY RESULTS TO SUMMARIZE:")
+            self.logger.info("="*70)
+            for i, row in enumerate(query_result[:5], 1):
+                self.logger.info(f"Row {i}: {row}")
+            if len(query_result) > 5:
+                self.logger.info(f"... and {len(query_result) - 5} more rows")
+            self.logger.info("="*70)
+        else:
+            self.logger.warning("No results to summarize - query_result is empty or None")
+            self.logger.debug(f"query_result type: {type(query_result)}, value: {query_result}")
+        
         # Generate summary
         response = self._summarize_results(user_input, query_result, generated_sql)
         
-        return {
+        execution_time = time.time() - start_time
+        self.logger.info(f"Summary generated in {execution_time:.3f}s")
+        
+        updates = {
             "response": response,
             "current_node": "result_summarizer"
         }
+        
+        log_node_exit(self.logger, "ResultSummarizer", updates)
+        return updates
     
     def _summarize_results(
         self,
@@ -60,17 +89,14 @@ class ResultSummarizer:
         
         system_prompt = f"""You are a data analyst presenting query results to a user.
 
-Summarize the query results in 2-3 sentences:
-1. Key findings or insights
-2. Notable patterns or values
-3. Brief context
+Summarize the query results in a clear, informative way:
+1. State how many rows were returned
+2. Show the actual data (format it nicely as a table or list)
+3. Provide any notable insights
 
-Keep it concise and informative. Maximum {config.RESULT_SUMMARY_MAX_TOKENS} tokens.
+Keep it clear and user-friendly. Maximum {config.RESULT_SUMMARY_MAX_TOKENS} tokens.
 
-DO NOT:
-- List all rows
-- Dump raw data
-- Repeat column names excessively"""
+Format the actual data so users can see what was returned. Include ALL returned rows if there are 10 or fewer."""
         
         user_message = f"""User asked: {user_input}
 
@@ -80,7 +106,7 @@ Query executed:
 Results ({len(results)} rows):
 {result_preview}
 
-Summarize these results."""
+Present these results to the user in a clear, readable format."""
         
         try:
             messages = [
@@ -110,15 +136,19 @@ Summarize these results."""
         
         columns = list(results[0].keys()) if results else []
         
-        summary = f"Found {num_rows} results"
+        summary = f"Query returned {num_rows} row{'s' if num_rows != 1 else ''}:\n\n"
         
-        if columns:
-            summary += f" with columns: {', '.join(columns)}"
+        # Show all rows if 10 or fewer, otherwise show first 5
+        rows_to_show = min(num_rows, 10)
         
-        # Show first row as example
-        if results:
-            first_row = results[0]
-            summary += f"\n\nExample: {first_row}"
+        for i, row in enumerate(results[:rows_to_show], 1):
+            summary += f"Row {i}:\n"
+            for key, value in row.items():
+                summary += f"  {key}: {value}\n"
+            summary += "\n"
+        
+        if num_rows > rows_to_show:
+            summary += f"... and {num_rows - rows_to_show} more rows"
         
         return summary
 

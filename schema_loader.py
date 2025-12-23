@@ -6,6 +6,7 @@ This avoids runtime schema discovery and improves performance.
 """
 from typing import Dict, Any, List
 from state import SchemaTable, SchemaCache
+from casino_schema import get_casino_tables_for_schema_loader
 import time
 import json
 
@@ -152,6 +153,44 @@ class SchemaLoader:
             
         except Exception as e:
             print(f"Warning: Failed to load schema from JSON: {e}")
+            return self._create_empty_cache()
+    
+    def load_casino_schema(self) -> SchemaCache:
+        """
+        Load the casino database schema.
+        
+        This loads the real casino schema with all 7 tables:
+        - customers
+        - customer_behaviors  
+        - transactions
+        - game_sessions
+        - gaming_equipment
+        - shifts
+        - employees
+        """
+        try:
+            tables_data = get_casino_tables_for_schema_loader()
+            
+            tables = []
+            for table_data in tables_data:
+                tables.append(SchemaTable(
+                    catalog=table_data["catalog"],
+                    schema=table_data["schema"],
+                    table=table_data["table"],
+                    columns=table_data["columns"],
+                    column_types=table_data["column_types"],
+                    description=table_data.get("description"),
+                ))
+            
+            self.cache = SchemaCache(
+                tables=tables,
+                last_updated=time.time()
+            )
+            
+            return self.cache
+            
+        except Exception as e:
+            print(f"Warning: Failed to load casino schema: {e}")
             return self._create_empty_cache()
     
     def load_mock_schema(self) -> SchemaCache:

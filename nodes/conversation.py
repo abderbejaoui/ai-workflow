@@ -12,6 +12,8 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from state import WorkflowState
 from utils import get_main_llm, format_conversation_history, truncate_history
 from config import config
+from logging_config import get_logger, log_node_entry, log_node_exit
+import time
 
 
 class ConversationResponder:
@@ -24,6 +26,7 @@ class ConversationResponder:
     
     def __init__(self):
         self.llm = get_main_llm()
+        self.logger = get_logger("ai_workflow.conversation")
     
     def __call__(self, state: WorkflowState) -> Dict[str, Any]:
         """
@@ -35,8 +38,13 @@ class ConversationResponder:
         Returns:
             Updated state with response
         """
+        log_node_entry(self.logger, "ConversationResponder", state)
+        start_time = time.time()
+        
         user_input = state.get("user_input", "")
         conversation_history = state.get("conversation_history", [])
+        
+        self.logger.info(f"Handling conversation: '{user_input[:100]}...'")
         
         # Use limited history to minimize tokens
         recent_history = truncate_history(
@@ -47,10 +55,16 @@ class ConversationResponder:
         # Generate response
         response = self._generate_response(user_input, recent_history)
         
-        return {
+        execution_time = time.time() - start_time
+        self.logger.info(f"Response generated in {execution_time:.3f}s")
+        
+        updates = {
             "response": response,
             "current_node": "conversation"
         }
+        
+        log_node_exit(self.logger, "ConversationResponder", updates)
+        return updates
     
     def _generate_response(self, user_input: str, history: list) -> str:
         """Generate a conversational response using the LLM."""
