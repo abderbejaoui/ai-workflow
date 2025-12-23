@@ -6,20 +6,27 @@ with tables for customers, transactions, gaming, and operations.
 """
 
 CASINO_SCHEMA = {
-    "customers": {
+    "customer": {
         "description": "Central customer profile repository containing unified customer data from survey and transaction sources.",
         "department": "CUSTOMER RELATIONS & MARKETING",
         "schema_name": "marketing_casino",
-        "full_table_name": "marketing_casino.customers",
+        "full_table_name": "marketing_casino.customer",
         "columns": {
-            "customer_id": "VARCHAR(50) - Unique identifier for each customer",
-            "gender": "VARCHAR(10) - Customer gender (Male/Female)",
-            "age": "INTEGER - Customer age in years",
-            "region": "VARCHAR(50) - Geographic region (North, Center, Lisbon, Alentejo, Algarve, Azores, Madeira)",
-            "marital_status": "VARCHAR(30) - Marital status (Single, Married, Divorced, Widowed)",
-            "employment_status": "VARCHAR(30) - Employment status (Employee, Self-employed, Unemployed, Student, Other)",
-            "education_level": "VARCHAR(30) - Education level (Primary, Secondary, Bachelor, Master, PhD)",
-            "risk_score": "INTEGER - Customer risk score 0-100"
+            "customer_id": "TEXT - Unique identifier for each customer",
+            "customer_name": "VARCHAR - Customer full name",
+            "gender": "TEXT - Customer gender (Male/Female)",
+            "age": "REAL - Customer age in years",
+            "region": "TEXT - Geographic region (North, Center, Lisbon, Alentejo, Algarve, Azores, Madeira)",
+            "marital_status": "TEXT - Marital status (Single, Married, Divorced, Widowed)",
+            "employment_status": "TEXT - Employment status (Employee, Self-employed, Unemployed, Student, Other)",
+            "education_level": "TEXT - Education level (Primary, Secondary, Bachelor, Master, PhD)",
+            "household_income_adequacy": "TEXT - Household income adequacy",
+            "registration_date": "TIMESTAMP - Customer registration date",
+            "last_activity_date": "TIMESTAMP - Last customer activity date",
+            "total_deposits": "TEXT - Total customer deposits (convert to decimal)",
+            "total_withdrawals": "TEXT - Total customer withdrawals (convert to decimal)",
+            "net_balance": "TEXT - Customer net balance (convert to decimal)",
+            "risk_score": "BIGINT - Customer risk score 0-100"
         },
         "use_cases": "Customer segmentation, demographic analysis, customer lifetime value calculation, geographic market analysis, risk-based customer management",
         "record_count": "7,678"
@@ -31,13 +38,24 @@ CASINO_SCHEMA = {
         "schema_name": "marketing_casino",
         "full_table_name": "marketing_casino.customer_behaviors",
         "columns": {
-            "behavior_id": "INTEGER - Unique behavior record identifier",
-            "customer_id": "VARCHAR(50) - Links to customers table",
-            "ever_bet_money": "BOOLEAN - Whether customer has ever bet money",
-            "offline_gambling_participation": "BOOLEAN - Offline gambling participation",
-            "online_gambling_participation": "BOOLEAN - Online gambling participation",
-            "problem_gambling_score": "INTEGER - Problem gambling score",
-            "risk_level": "VARCHAR(20) - Risk level (low/medium/high)"
+            "behavior_id": "BIGINT - Unique behavior record identifier",
+            "customer_id": "TEXT - Links to customer table",
+            "ever_bet_money": "BIGINT - Whether customer has ever bet money (0/1)",
+            "offline_gambling_participation": "BIGINT - Offline gambling participation (0/1)",
+            "online_gambling_participation": "BIGINT - Online gambling participation (0/1)",
+            "lifetime_gambling_occasions_offline": "REAL - Total lifetime offline gambling occasions",
+            "lifetime_gambling_occasions_online": "REAL - Total lifetime online gambling occasions",
+            "gambling_occasions_12months_offline": "REAL - Offline gambling occasions in last 12 months",
+            "gambling_occasions_12months_online": "REAL - Online gambling occasions in last 12 months",
+            "gambling_occasions_3months_offline": "REAL - Offline gambling occasions in last 3 months",
+            "gambling_occasions_3months_online": "REAL - Online gambling occasions in last 3 months",
+            "monthly_gambling_expenditure_offline": "REAL - Average monthly offline gambling expenditure",
+            "monthly_gambling_expenditure_online": "REAL - Average monthly online gambling expenditure",
+            "smartphone_usage_frequency": "REAL - Smartphone usage frequency",
+            "tablet_usage_frequency": "REAL - Tablet usage frequency",
+            "laptop_desktop_usage_frequency": "REAL - Laptop/desktop usage frequency",
+            "problem_gambling_score": "REAL - Problem gambling score",
+            "risk_level": "TEXT - Risk level (low/medium/high)"
         },
         "use_cases": "Problem gambling identification, behavioral segmentation, risk assessment, responsible gambling initiatives",
         "record_count": "1,993"
@@ -53,7 +71,7 @@ CASINO_SCHEMA = {
             "customer_id": "VARCHAR(50) - Links to customers table",
             "req_time_utc": "TIMESTAMP - Transaction timestamp in UTC",
             "transaction_type": "VARCHAR(30) - Type of transaction",
-            "transaction_amount": "DECIMAL(10,2) - Transaction amount in USD",
+            "transaction_amount": "TEXT - Transaction amount in USD you need to convert it to a decimal number",
             "status": "VARCHAR(20) - Transaction status (APPROVED/DECLINED)",
             "direction": "VARCHAR(10) - Transaction direction (IN/OUT)"
         },
@@ -126,7 +144,7 @@ CASINO_SCHEMA = {
             "position": "VARCHAR(50) - Job position",
             "hire_date": "DATE - Employee hire date",
             "salary": "DECIMAL(8,2) - Annual salary",
-            "is_active": "BOOLEAN - Whether employee is active"
+            "is_active": "INTEGER - 0 or 1 Whether employee is active"
         },
         "use_cases": "Employee directory management, department staffing analysis, compensation planning, workforce development",
         "record_count": "50"

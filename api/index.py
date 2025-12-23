@@ -3,6 +3,8 @@ FastAPI application for AI Workflow - Vercel Serverless Function
 """
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import sys
@@ -23,6 +25,11 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Mount static files (if public directory exists)
+public_dir = os.path.join(os.path.dirname(__file__), "public")
+if os.path.exists(public_dir):
+    app.mount("/static", StaticFiles(directory=public_dir), name="static")
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -39,12 +46,14 @@ logger = get_logger("ai_workflow.api")
 # Global state
 _workflow = None
 _schema_cache = None
+_conversation_history: Dict[str, List[Dict[str, str]]] = {}  # session_id -> history
 
 
 class QueryRequest(BaseModel):
     """Request model for query endpoint."""
     query: str
-    conversation_history: Optional[List[Dict[str, str]]] = []
+    session_id: Optional[str] = "default"  # For session-based history
+    conversation_history: Optional[List[Dict[str, str]]] = None  # Optional override
 
 
 class QueryResponse(BaseModel):
@@ -55,6 +64,7 @@ class QueryResponse(BaseModel):
     execution_time: float
     path_taken: str
     error: Optional[str] = None
+    conversation_history: Optional[List[Dict[str, str]]] = None  # Return updated history
 
 
 def initialize_system():
@@ -78,14 +88,23 @@ async def startup_event():
     initialize_system()
 
 
-@app.get("/")
+@app.get("/", response_class=HTMLResponse)
 async def root():
-    """Root endpoint - health check."""
-    return {
-        "status": "ok",
-        "message": "AI Workflow API is running",
-        "version": "1.0.0"
-    }
+    """Root endpoint - serve the test UI."""
+    html_path = os.path.join(os.path.dirname(__file__), "public", "index.html")
+    
+    if os.path.exists(html_path):
+        with open(html_path, "r") as f:
+            return f.read()
+    else:
+        # Fallback if HTML file doesn't exist
+        return {
+            "status": "ok",
+            "message": "AI Workflow API is running",
+            "version": "1.0.0",
+            "docs": "/docs",
+            "health": "/health"
+        }
 
 
 @app.get("/health")
@@ -126,16 +145,30 @@ async def execute_query(request: QueryRequest):
     Returns:
         Query response with results and metadata
     """
+    global _conversation_history
+    
     try:
         # Ensure system is initialized
         if _workflow is None:
             initialize_system()
         
+        session_id = request.session_id or "default"
+        
+        # Get or create conversation history for this session
+        if request.conversation_history is not None:
+            # Use provided history (client override)
+            history = request.conversation_history
+        else:
+            # Use server-side history
+            history = _conversation_history.get(session_id, [])
+        
+        logger.info(f"Session {session_id}: Processing query with {len(history)} history items")
+        
         # Create initial state
         initial_state = create_initial_state(
             user_input=request.query,
             schema_cache=_schema_cache,
-            conversation_history=request.conversation_history or []
+            conversation_history=history
         )
         
         # Execute workflow
@@ -153,18 +186,55 @@ async def execute_query(request: QueryRequest):
         error = final_state.get("error_message")
         path = final_state.get("current_node", "unknown")
         
+        # Update conversation history
+        history.append({"role": "user", "content": request.query})
+        history.append({"role": "assistant", "content": response})
+        
+        # Limit history size to prevent memory bloat
+        if len(history) > 20:
+            history = history[-20:]
+        
+        # Store updated history
+        _conversation_history[session_id] = history
+        
+        logger.info(f"Session {session_id}: History now has {len(history)} items")
+        
         return QueryResponse(
             response=response,
             sql=sql,
             results=results,
             execution_time=execution_time,
             path_taken=path,
-            error=error
+            error=error,
+            conversation_history=history
         )
         
     except Exception as e:
         logger.error(f"Error executing query: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/history/{session_id}")
+async def clear_history(session_id: str = "default"):
+    """Clear conversation history for a session."""
+    global _conversation_history
+    
+    if session_id in _conversation_history:
+        del _conversation_history[session_id]
+        return {"status": "cleared", "session_id": session_id}
+    
+    return {"status": "not_found", "session_id": session_id}
+
+
+@app.get("/history/{session_id}")
+async def get_history(session_id: str = "default"):
+    """Get conversation history for a session."""
+    history = _conversation_history.get(session_id, [])
+    return {
+        "session_id": session_id,
+        "history": history,
+        "message_count": len(history)
+    }
 
 
 @app.get("/examples")

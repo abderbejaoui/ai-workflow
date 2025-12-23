@@ -127,22 +127,26 @@ class SupervisorNode:
 Your job: Analyze the user's request and classify it into ONE of three categories:
 
 1. **databricks** - User wants to query casino data, run analytics, or get insights from tables
-   Examples: "Show me customer data", "What's the total revenue?", "List high-risk customers"
+   Examples: "Show me customer data", "What's the total revenue?", "List high-risk customers", "Show employees"
    
    Available Casino Tables:
-   - customers (7,678 records) - Customer profiles, demographics, risk scores
-   - customer_behaviors (1,993 records) - Gambling patterns, problem gambling indicators
-   - transactions (586,781 records) - Payment transactions, deposits, withdrawals
-   - game_sessions (3,000 records) - Gaming sessions, bets, wins, duration
-   - gaming_equipment (20 records) - Tables, machines, equipment status
-   - shifts (100 records) - Employee shifts, performance metrics
-   - employees (50 records) - Staff directory, departments, salaries
+   - marketing_casino.customer - Customer profiles with: customer_id, customer_name, gender, age, region, risk_score (0-100)
+   - marketing_casino.customer_behaviors - Gambling patterns with: problem_gambling_score, risk_level (low/medium/high)
+   - finance_casino.transactions - Payments with: transaction_amount, transaction_type, status
+   - operations_casino.game_sessions - Gaming with: total_bets, total_wins, net_result
+   - operations_casino.gaming_equipment - Equipment with: equipment_name, status, hourly_revenue
+   - operations_casino.shifts - Shifts with: total_revenue, total_transactions
+   - hr_casino.employees - Staff with: first_name, last_name, department, salary
+   
+   IMPORTANT: For "high-risk" customers, use:
+   - marketing_casino.customer_behaviors.risk_level = 'high'
+   - OR marketing_casino.customer.risk_score > 70
 
 2. **conversation** - General chat, greetings, system questions (not about data)
    Examples: "Hello", "How are you?", "What can you do?", "Thank you"
 
-3. **fallback** - Unclear, ambiguous, or needs clarification
-   Examples: "Show me that thing", "What about yesterday?", "Give me the data"
+3. **fallback** - ONLY use if the query is truly ambiguous or unrelated to the database
+   Examples: "Show me that thing from yesterday", "Give me the data" (no context)
 
 Also provide a confidence score (0.0 to 1.0):
 - 0.9-1.0: Very clear intent

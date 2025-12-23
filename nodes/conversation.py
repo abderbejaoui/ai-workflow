@@ -68,19 +68,26 @@ class ConversationResponder:
     
     def _generate_response(self, user_input: str, history: list) -> str:
         """Generate a conversational response using the LLM."""
-        system_prompt = """You are a helpful AI assistant for a data analytics platform.
+        history_context = ""
+        if history:
+            history_context = f"\n\nYou have access to the conversation history below. Use it to provide context-aware responses."
+        
+        system_prompt = f"""You are a helpful AI assistant for a Casino Database analytics platform.
 
 You help users with:
 - General questions and conversation
-- Explaining what you can do
+- Explaining what you can do (query casino data: employees, customers, transactions, game sessions, shifts, equipment)
 - Guiding them on how to query data
+- Answering follow-up questions using the conversation history
 
 Keep responses:
 - Concise (2-3 sentences max)
 - Friendly and professional
 - Actionable
+- Context-aware (remember what users asked before)
 
-If users want to query data, encourage them to ask specific questions about the data they want to see."""
+If users ask about previous questions, refer to the conversation history.
+If users want to query data, encourage them to ask specific questions about the casino database.{history_context}"""
         
         try:
             messages = [SystemMessage(content=system_prompt)]

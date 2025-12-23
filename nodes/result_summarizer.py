@@ -22,7 +22,15 @@ class ResultSummarizer:
     """
     
     def __init__(self):
-        self.llm = get_main_llm()
+        # Use faster model for summarization (gpt-4o-mini is 10x faster)
+        from langchain_openai import ChatOpenAI
+        from config import config
+        
+        self.llm = ChatOpenAI(
+            model="gpt-4o-mini",  # Faster and cheaper than gpt-4o
+            temperature=0.7,
+            max_tokens=300
+        )
         self.logger = get_logger("ai_workflow.result_summarizer")
     
     def __call__(self, state: WorkflowState) -> Dict[str, Any]:
@@ -83,6 +91,11 @@ class ResultSummarizer:
         
         if not results:
             return "The query executed successfully but returned no results."
+        
+        # Fast path: For simple "show me" queries, use basic summary
+        simple_keywords = ['show', 'list', 'get', 'give', 'display']
+        if any(keyword in user_input.lower() for keyword in simple_keywords) and len(results) <= 10:
+            return self._basic_summary(results, user_input)
         
         # Format results for context
         result_preview = format_query_result(results, max_rows=5)

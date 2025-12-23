@@ -9,6 +9,12 @@ from state import SchemaTable, SchemaCache
 from casino_schema import get_casino_tables_for_schema_loader
 import time
 import json
+import requests
+from config import config
+
+
+# Casino API URL
+CASINO_API_URL = "http://44.251.222.149:8000/api/sql/execute-query"
 
 
 class SchemaLoader:
@@ -159,14 +165,117 @@ class SchemaLoader:
         """
         Load the casino database schema.
         
-        This loads the real casino schema with all 7 tables:
-        - customers
-        - customer_behaviors  
-        - transactions
-        - game_sessions
-        - gaming_equipment
-        - shifts
-        - employees
+        First tries to load dynamically from the database.
+        Falls back to static schema if dynamic loading fails.
+        """
+        try:
+            # Try dynamic loading first
+            print("Attempting to load schema dynamically from database...")
+            return self.load_from_database()
+        except Exception as e:
+            print(f"Dynamic schema loading failed: {e}")
+            print("Falling back to static schema...")
+            return self._load_static_casino_schema()
+    
+    def load_from_database(self) -> SchemaCache:
+        """
+        Dynamically load schema from the Casino database API.
+        
+        This queries the information_schema to get actual table and column info.
+        """
+        # Define which schemas to include (casino-related only)
+        casino_schemas = [
+            'hr_casino',
+            'marketing_casino', 
+            'operations_casino',
+            'finance_casino'
+        ]
+        
+        # Query to get all tables and columns from casino schemas
+        sql = f"""
+        SELECT 
+            table_schema as schema_name,
+            table_name,
+            column_name,
+            data_type,
+            ordinal_position
+        FROM information_schema.columns 
+        WHERE table_schema IN ({','.join([f"'{s}'" for s in casino_schemas])})
+        ORDER BY table_schema, table_name, ordinal_position;
+        """
+        
+        response = requests.post(
+            CASINO_API_URL,
+            json={"sql_query": sql, "params": None},
+            timeout=10,
+            headers={'Content-Type': 'application/json'}
+        )
+        
+        if response.status_code != 200:
+            raise Exception(f"API returned status {response.status_code}")
+        
+        data = response.json()
+        
+        if not data.get("success"):
+            raise Exception(data.get("error", "Unknown error"))
+        
+        columns_data = data.get("data", [])
+        
+        if not columns_data:
+            raise Exception("No column data returned")
+        
+        # Organize by table
+        tables_dict = {}
+        for row in columns_data:
+            schema_name = row['schema_name']
+            table_name = row['table_name']
+            column_name = row['column_name']
+            data_type = row['data_type']
+            
+            full_name = f"{schema_name}.{table_name}"
+            
+            if full_name not in tables_dict:
+                tables_dict[full_name] = {
+                    "schema": schema_name,
+                    "table": table_name,
+                    "columns": [],
+                    "column_types": {}
+                }
+            
+            tables_dict[full_name]["columns"].append(column_name)
+            tables_dict[full_name]["column_types"][column_name] = data_type
+        
+        # Get table descriptions from static config (for context)
+        static_tables = {t["table"]: t.get("description", "") for t in get_casino_tables_for_schema_loader()}
+        
+        # Convert to SchemaTable objects
+        tables = []
+        for full_name, table_data in tables_dict.items():
+            description = static_tables.get(table_data["table"], f"Table {full_name}")
+            
+            tables.append(SchemaTable(
+                catalog=table_data["schema"],
+                schema=table_data["schema"],
+                table=table_data["table"],
+                columns=table_data["columns"],
+                column_types=table_data["column_types"],
+                description=description,
+            ))
+        
+        self.cache = SchemaCache(
+            tables=tables,
+            last_updated=time.time()
+        )
+        
+        print(f"✓ Dynamically loaded {len(tables)} tables from database")
+        
+        return self.cache
+    
+    def _load_static_casino_schema(self) -> SchemaCache:
+        """
+        Load casino schema from static configuration.
+        
+        This is the fallback when dynamic loading fails.
         """
         try:
             tables_data = get_casino_tables_for_schema_loader()
@@ -187,11 +296,26 @@ class SchemaLoader:
                 last_updated=time.time()
             )
             
+            print(f"✓ Loaded {len(tables)} tables from static schema")
+            
             return self.cache
             
         except Exception as e:
             print(f"Warning: Failed to load casino schema: {e}")
             return self._create_empty_cache()
+    
+    def refresh_schema(self) -> SchemaCache:
+        """
+        Force refresh the schema from the database.
+        
+        Call this if you know the database schema has changed.
+        """
+        print("Refreshing schema from database...")
+        try:
+            return self.load_from_database()
+        except Exception as e:
+            print(f"Refresh failed: {e}")
+            return self.cache or self._create_empty_cache()
     
     def load_mock_schema(self) -> SchemaCache:
         """

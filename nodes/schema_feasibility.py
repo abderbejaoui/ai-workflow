@@ -101,25 +101,34 @@ class SchemaFeasibilityChecker:
         schema_description = self._format_schema_for_analysis(tables)
         
         # Use LLM to determine feasibility
-        system_prompt = """You are a schema analyst. Analyze if a user's query can be answered using the available database schema.
+        system_prompt = """You are a schema analyst for a casino database. Analyze if a user's query can be answered.
 
 Your task:
 1. Identify which tables are needed
-2. Check if required columns likely exist
+2. Check if required columns exist
 3. Determine if the query is feasible
+
+IMPORTANT SCHEMA HINTS:
+- "high-risk customers" → Use marketing_casino.customer_behaviors.risk_level = 'high' 
+  OR marketing_casino.customer.risk_score > 70
+- "problem gambling" → Use marketing_casino.customer_behaviors.problem_gambling_score
+- "revenue" → Use operations_casino.shifts.total_revenue OR operations_casino.gaming_equipment.hourly_revenue
+- "transactions" → Use finance_casino.transactions
+- "employees/staff" → Use hr_casino.employees
+
+BE GENEROUS with feasibility - if the query mentions something that could map to a column, mark it FEASIBLE.
 
 Respond with JSON:
 {
   "feasible": true/false,
-  "tables": ["table1", "table2"],
+  "tables": ["schema.table1", "schema.table2"],
   "columns": ["col1", "col2"],
   "reason": "explanation"
 }
 
-Mark as NOT feasible if:
-- Required tables don't exist
-- Column names are too ambiguous
-- Query requires joins that don't make sense"""
+Mark as NOT feasible ONLY if:
+- Tables clearly don't exist
+- Query is about completely unrelated data (e.g., weather, sports scores)"""
         
         user_message = f"""Available schema:
 {schema_description}
@@ -168,21 +177,20 @@ Can this query be answered with the available schema?"""
             table_name = table.get("full_name") or table.get("table", "unknown")
             columns = table.get("columns", [])
             column_types = table.get("column_types", {})
+            description = table.get("description", "")
             
-            # Format: table_name (col1: type1, col2: type2, ...)
-            col_info = []
-            for col in columns[:10]:  # First 10 columns
-                col_type = column_types.get(col, "unknown")
-                col_info.append(f"{col}: {col_type}")
+            # Format: table_name - description
+            # Columns: col1, col2, col3...
+            lines.append(f"\n📋 {table_name}")
+            if description:
+                lines.append(f"   Description: {description}")
             
-            col_str = ", ".join(col_info)
-            if len(columns) > 10:
-                col_str += f" ... (+{len(columns) - 10} more)"
-            
-            lines.append(f"- {table_name} ({col_str})")
+            # Show all columns (they're important for mapping queries)
+            col_list = ", ".join(columns)
+            lines.append(f"   Columns: {col_list}")
         
         if len(tables) > 20:
-            lines.append(f"... and {len(tables) - 20} more tables")
+            lines.append(f"\n... and {len(tables) - 20} more tables")
         
         return "\n".join(lines)
 

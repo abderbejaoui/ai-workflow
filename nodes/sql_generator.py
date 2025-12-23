@@ -89,7 +89,7 @@ Generate a SQL query following these STRICT rules:
 1. NO SELECT * - Always specify explicit column names
 2. Use FULLY QUALIFIED table names (schema.table_name format):
    - hr_casino.employees for employee data
-   - marketing_casino.customers for customer data
+   - marketing_casino.customer for customer data (NOTE: singular 'customer' not 'customers')
    - marketing_casino.customer_behaviors for customer behavior data
    - operations_casino.game_sessions for game session data
    - operations_casino.gaming_equipment for gaming equipment data
@@ -108,7 +108,20 @@ CRITICAL - Understand query intent:
 - "each X" → Use GROUP BY X
 - Time periods ("last month", "last year") → Use WHERE with date comparisons
 
-AGGREGATION EXAMPLES:
+COMMON QUERY MAPPINGS:
+- "high-risk customers" → WHERE risk_level = 'high' (from customer_behaviors) OR risk_score > 70 (from customer)
+- "problem gambling" → problem_gambling_score from customer_behaviors
+- transaction_amount is TEXT, use CAST(transaction_amount AS DECIMAL)
+
+EXAMPLES:
+
+Q: "Show high-risk customers"
+A: SELECT c.customer_id, c.customer_name, c.risk_score, cb.risk_level, cb.problem_gambling_score
+   FROM marketing_casino.customer c
+   JOIN marketing_casino.customer_behaviors cb ON c.customer_id = cb.customer_id
+   WHERE cb.risk_level = 'high'
+   ORDER BY cb.problem_gambling_score DESC
+   LIMIT 100;
 
 Q: "Which employees generated the highest revenue per shift?"
 A: SELECT e.employee_id, e.first_name, e.last_name, 
@@ -122,14 +135,14 @@ A: SELECT e.employee_id, e.first_name, e.last_name,
 
 Q: "How many customers from each region?"
 A: SELECT region, COUNT(customer_id) as customer_count
-   FROM marketing_casino.customers
+   FROM marketing_casino.customer
    GROUP BY region
    ORDER BY customer_count DESC
    LIMIT 100;
 
 Q: "Total transactions per customer"
 A: SELECT customer_id, COUNT(transaction_id) as total_transactions, 
-          SUM(transaction_amount) as total_amount
+          SUM(CAST(transaction_amount AS DECIMAL)) as total_amount
    FROM finance_casino.transactions
    GROUP BY customer_id
    ORDER BY total_amount DESC
