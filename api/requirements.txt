@@ -15,9 +15,5 @@ langgraph
 # Utilities
 python-dotenv
 requests
-
-# For API - httpx is required by openai
 httpx
-
-# Required for async in Vercel
 anyio

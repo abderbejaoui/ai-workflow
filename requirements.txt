@@ -1,16 +1,16 @@
 # FastAPI (REQUIRED for Vercel)
-fastapi>=0.109.0
-uvicorn>=0.27.0
+fastapi
+uvicorn
 
 # Core AI dependencies
-langgraph>=0.0.40
-langchain>=0.1.0
-langchain-openai>=0.0.5
-langchain-core>=0.1.0
+langgraph
+langchain
+langchain-openai
+langchain-core
 
 # HTTP requests for Casino API
-requests>=2.31.0
+requests
 
 # Environment and validation
-python-dotenv>=1.0.0
-pydantic>=2.0.0
+python-dotenv
+pydantic
