@@ -1,21 +1,23 @@
 # Core dependencies
-fastapi==0.109.0
-pydantic==2.5.3
-uvicorn==0.27.0
+fastapi
+pydantic
+uvicorn
 
 # LangChain and LLMs
-langchain==0.1.0
-langchain-core==0.1.10
-langchain-openai==0.0.2
-openai==1.7.2
+langchain
+langchain-core
+langchain-openai
+openai
 
 # LangGraph for workflow
-langgraph==0.0.20
+langgraph
 
 # Utilities
-python-dotenv==1.0.0
-requests==2.31.0
+python-dotenv
+requests
 
-# For API
-httpx==0.26.0
+# For API - httpx is required by openai
+httpx
 
+# Required for async in Vercel
+anyio

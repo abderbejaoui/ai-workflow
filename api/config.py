@@ -12,9 +12,9 @@ load_dotenv()
 class Config:
     """Central configuration class for all system settings."""
     
-    # LLM Configuration
-    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
-    ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
+    # LLM Configuration - strip whitespace from API keys
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "").strip()
+    ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "").strip()
     
     # Supervisor settings - uses fast, cheap model
     SUPERVISOR_MODEL: str = os.getenv("SUPERVISOR_MODEL", "gpt-4o-mini")

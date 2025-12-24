@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "name": "ai-workflow-api",
   "builds": [
     {
       "src": "api/index.py",
@@ -12,11 +11,5 @@
       "src": "/(.*)",
       "dest": "api/index.py"
     }
-  ],
-  "env": {
-    "OPENAI_API_KEY": "@openai-api-key",
-    "CASINO_API_URL": "@casino-api-url",
-    "LOG_LEVEL": "INFO"
-  }
+  ]
 }
-

@@ -6,11 +6,18 @@ Token-efficient (≤ 150 tokens).
 """
 from typing import Dict, Any, List
 from langchain_core.messages import SystemMessage, HumanMessage
-from state import WorkflowState
-from utils import get_main_llm, format_query_result
-from config import config
-from logging_config import get_logger, log_node_entry, log_node_exit
 import time
+
+try:
+    from ..state import WorkflowState
+    from ..utils import get_main_llm, format_query_result
+    from ..config import config
+    from ..logging_config import get_logger, log_node_entry, log_node_exit
+except ImportError:
+    from state import WorkflowState
+    from utils import get_main_llm, format_query_result
+    from config import config
+    from logging_config import get_logger, log_node_entry, log_node_exit
 
 
 class ResultSummarizer:

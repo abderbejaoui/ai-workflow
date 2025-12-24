@@ -3,20 +3,34 @@ FastAPI application for AI Workflow - Vercel Serverless Function
 """
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
-import sys
 import os
+import time
+import traceback
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from workflow import get_workflow, create_initial_state
-from schema_loader import get_schema_loader
-from config import config
-from logging_config import init_default_logger, get_logger
+# Try relative imports first (for Vercel), then absolute (for local)
+try:
+    # Vercel deployment - use relative imports
+    from .workflow import get_workflow, create_initial_state
+    from .schema_loader import get_schema_loader
+    from .config import config
+    from .logging_config import init_default_logger, get_logger
+except ImportError:
+    # Local development - use absolute imports
+    import sys
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_dir = os.path.dirname(current_dir)
+    for path in [current_dir, parent_dir]:
+        if path not in sys.path:
+            sys.path.insert(0, path)
+    
+    from workflow import get_workflow, create_initial_state
+    from schema_loader import get_schema_loader
+    from config import config
+    from logging_config import init_default_logger, get_logger
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -97,22 +111,37 @@ async def root():
         with open(html_path, "r") as f:
             return f.read()
     else:
-        # Fallback if HTML file doesn't exist
-        return {
-            "status": "ok",
-            "message": "AI Workflow API is running",
-            "version": "1.0.0",
-            "docs": "/docs",
-            "health": "/health"
-        }
+        # Fallback if HTML file doesn't exist - return simple HTML
+        return """
+        <!DOCTYPE html>
+        <html>
+        <head><title>AI Workflow API</title></head>
+        <body style="font-family: Arial, sans-serif; padding: 40px; max-width: 600px; margin: 0 auto;">
+            <h1>🎰 AI Workflow API</h1>
+            <p>The API is running successfully!</p>
+            <h3>Available Endpoints:</h3>
+            <ul>
+                <li><a href="/docs">/docs</a> - API Documentation</li>
+                <li><a href="/health">/health</a> - Health Check</li>
+                <li><a href="/schema">/schema</a> - Database Schema</li>
+                <li><a href="/examples">/examples</a> - Example Queries</li>
+            </ul>
+            <h3>Query Endpoint:</h3>
+            <code>POST /query</code> with JSON body: <code>{"query": "your question"}</code>
+        </body>
+        </html>
+        """
 
 
 @app.get("/health")
 async def health():
     """Health check endpoint."""
+    api_key = config.OPENAI_API_KEY or os.getenv("OPENAI_API_KEY", "")
     return {
         "status": "healthy",
-        "tables_cached": len(_schema_cache.get("tables", [])) if _schema_cache else 0
+        "tables_cached": len(_schema_cache.get("tables", [])) if _schema_cache else 0,
+        "openai_configured": bool(api_key and len(api_key) > 10),
+        "openai_key_prefix": api_key[:15] + "..." if api_key else "NOT SET"
     }
 
 
@@ -172,7 +201,6 @@ async def execute_query(request: QueryRequest):
         )
         
         # Execute workflow
-        import time
         start_time = time.time()
         
         final_state = _workflow.invoke(initial_state)
@@ -268,8 +296,4 @@ async def get_examples():
             }
         ]
     }
-
-
-# Vercel serverless function handler
-handler = app
 

@@ -118,48 +118,73 @@ class SupervisorNode:
     
     def _classify_intent(self, context: str) -> SupervisorOutput:
         """
-        Classify intent using a single LLM call.
+        Classify intent using keyword matching first, then LLM as fallback.
         
         Returns intent and confidence score.
         """
+        # FAST PATH: Keyword-based classification for obvious data queries
+        data_keywords = [
+            'show', 'list', 'get', 'find', 'display', 'give', 'select',
+            'employe',  # Catches employee, employees
+            'customer', 'transaction', 'shift', 'session',
+            'equipment', 'revenue', 'salary', 'risk', 'how many',
+            'what is', 'average', 'total', 'count', 'sum', 'top',
+            'highest', 'lowest', 'first', 'last', 'region', 'department',
+            'gambling', 'behavior', 'game', 'bet', 'win', 'loss'
+        ]
+        
+        context_lower = context.lower()
+        matching_keywords = [kw for kw in data_keywords if kw in context_lower]
+        
+        if len(matching_keywords) >= 1:
+            # Direct classification - skip LLM
+            return SupervisorOutput(
+                intent="databricks",
+                confidence=0.95,
+                reasoning=f"Matched data keywords: {matching_keywords[:3]}"
+            )
+        
+        # Check for obvious conversation patterns
+        conversation_patterns = ['hello', 'hi', 'hey', 'thank', 'bye', 'help', 'how are you']
+        if any(pattern in context_lower for pattern in conversation_patterns):
+            return SupervisorOutput(
+                intent="conversation",
+                confidence=0.9,
+                reasoning="Matched conversation pattern"
+            )
+        
+        # SLOW PATH: Use LLM for ambiguous queries
         system_prompt = """You are an intent classifier for a casino data analytics system.
 
-Your job: Analyze the user's request and classify it into ONE of three categories:
+CLASSIFY the user's request into ONE of three categories:
 
-1. **databricks** - User wants to query casino data, run analytics, or get insights from tables
-   Examples: "Show me customer data", "What's the total revenue?", "List high-risk customers", "Show employees"
+1. **databricks** - ANY query about data, numbers, records, or database tables
+   USE THIS FOR:
+   - "Show me X employees" → databricks
+   - "List customers" → databricks  
+   - "Get transactions" → databricks
+   - "How many..." → databricks
+   - "What is the average..." → databricks
+   - "Find..." → databricks
+   - ANY mention of: employees, customers, transactions, sessions, equipment, shifts, revenue, salary
    
-   Available Casino Tables:
-   - marketing_casino.customer - Customer profiles with: customer_id, customer_name, gender, age, region, risk_score (0-100)
-   - marketing_casino.customer_behaviors - Gambling patterns with: problem_gambling_score, risk_level (low/medium/high)
-   - finance_casino.transactions - Payments with: transaction_amount, transaction_type, status
-   - operations_casino.game_sessions - Gaming with: total_bets, total_wins, net_result
-   - operations_casino.gaming_equipment - Equipment with: equipment_name, status, hourly_revenue
-   - operations_casino.shifts - Shifts with: total_revenue, total_transactions
-   - hr_casino.employees - Staff with: first_name, last_name, department, salary
-   
-   IMPORTANT: For "high-risk" customers, use:
-   - marketing_casino.customer_behaviors.risk_level = 'high'
-   - OR marketing_casino.customer.risk_score > 70
+   Available tables: employees, customer, customer_behaviors, transactions, game_sessions, gaming_equipment, shifts
 
-2. **conversation** - General chat, greetings, system questions (not about data)
-   Examples: "Hello", "How are you?", "What can you do?", "Thank you"
+2. **conversation** - ONLY for greetings or meta questions about the system
+   - "Hello", "Hi", "Hey"
+   - "How are you?"
+   - "What can you do?"
+   - "Thank you", "Thanks"
+   - "Help"
 
-3. **fallback** - ONLY use if the query is truly ambiguous or unrelated to the database
-   Examples: "Show me that thing from yesterday", "Give me the data" (no context)
+3. **fallback** - ONLY if truly nonsensical or unrelated
+   - "asdfgh"
+   - "What's the weather?"
 
-Also provide a confidence score (0.0 to 1.0):
-- 0.9-1.0: Very clear intent
-- 0.75-0.89: Clear intent
-- 0.5-0.74: Somewhat clear
-- 0.0-0.49: Ambiguous
+IMPORTANT: If the query mentions ANY data term (employees, customers, show, list, get, find, how many), classify as **databricks** with HIGH confidence (0.9+).
 
-Respond ONLY with JSON:
-{
-  "intent": "databricks" | "conversation" | "fallback",
-  "confidence": 0.85,
-  "reasoning": "brief explanation"
-}"""
+Respond with JSON only:
+{"intent": "databricks", "confidence": 0.95, "reasoning": "mentions employees"}"""
         
         try:
             messages = [
@@ -213,23 +238,22 @@ Respond ONLY with JSON:
         Determine which node to route to based on intent and confidence.
         
         Routing logic:
-        - databricks + confidence >= 0.75 → databricks_path
-        - confidence < 0.75 → fallback
+        - databricks + confidence >= 0.5 → databricks_path (lowered threshold)
         - conversation → conversation_path
+        - fallback only for truly ambiguous queries
         """
-        if intent == "databricks" and confidence >= 0.75:
+        if intent == "databricks" and confidence >= 0.5:
             return "databricks_path"
-        elif confidence < 0.75:
-            return "fallback"
         elif intent == "conversation":
             return "conversation_path"
-        else:
+        elif confidence < 0.4:
             return "fallback"
+        else:
+            # Default to databricks for data-related queries
+            return "databricks_path"
 
 
 # Convenience function for LangGraph
 def supervisor_node(state: WorkflowState) -> Dict[str, Any]:
     """LangGraph node function for the supervisor."""
     node = SupervisorNode()
-    return node(state)
-

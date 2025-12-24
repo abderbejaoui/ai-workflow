@@ -1,25 +1,16 @@
-# Core dependencies
+# FastAPI (REQUIRED for Vercel)
+fastapi>=0.109.0
+uvicorn>=0.27.0
+
+# Core AI dependencies
 langgraph>=0.0.40
 langchain>=0.1.0
 langchain-openai>=0.0.5
-langchain-anthropic>=0.1.0
+langchain-core>=0.1.0
 
 # HTTP requests for Casino API
 requests>=2.31.0
 
-# Database (optional - for local testing)
-databricks-sql-connector>=3.0.0
-
-# Caching and performance
-redis>=5.0.0
+# Environment and validation
 python-dotenv>=1.0.0
-
-# Data processing
-pandas>=2.0.0
-
-# Validation
 pydantic>=2.0.0
-
-# Async support
-aiohttp>=3.9.0
-

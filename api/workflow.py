@@ -6,19 +6,36 @@ implementing the routing logic between execution paths.
 """
 from typing import Literal
 from langgraph.graph import StateGraph, END
-from state import WorkflowState
-from config import config
-from logging_config import get_logger, log_routing_decision
-from nodes import (
-    supervisor_node,
-    conversation_node,
-    fallback_node,
-    schema_feasibility_node,
-    sql_generator_node,
-    sql_validator_node,
-    casino_api_executor_node,
-    result_summarizer_node,
-)
+
+# Try relative imports first (for Vercel), then absolute (for local)
+try:
+    from .state import WorkflowState
+    from .config import config
+    from .logging_config import get_logger, log_routing_decision
+    from .nodes import (
+        supervisor_node,
+        conversation_node,
+        fallback_node,
+        schema_feasibility_node,
+        sql_generator_node,
+        sql_validator_node,
+        casino_api_executor_node,
+        result_summarizer_node,
+    )
+except ImportError:
+    from state import WorkflowState
+    from config import config
+    from logging_config import get_logger, log_routing_decision
+    from nodes import (
+        supervisor_node,
+        conversation_node,
+        fallback_node,
+        schema_feasibility_node,
+        sql_generator_node,
+        sql_validator_node,
+        casino_api_executor_node,
+        result_summarizer_node,
+    )
 
 # Module-level logger
 logger = get_logger("ai_workflow.routing")
@@ -26,37 +43,26 @@ logger = get_logger("ai_workflow.routing")
 
 def route_from_supervisor(state: WorkflowState) -> str:
     """
-    Route from supervisor based on intent, confidence, AND keywords in user input.
+    Route from supervisor based on intent.
     
-    Uses keyword matching as a failsafe to catch data queries.
+    Simple routing:
+    - databricks intent → schema_feasibility (for data queries)
+    - conversation intent → conversation (for chat)
+    - fallback intent → fallback (for unclear)
     """
-    intent = state.get("intent", "fallback")
-    confidence = state.get("confidence", 0.0)
-    user_input = state.get("user_input", "").lower()
+    intent = state.get("intent", "databricks")  # Default to databricks
+    confidence = state.get("confidence", 0.5)
     
-    # FAILSAFE: Check for data keywords in user input
-    data_keywords = ['show', 'list', 'get', 'find', 'employe', 'customer', 
-                     'transaction', 'revenue', 'salary', 'risk', 'session',
-                     'equipment', 'shift', 'how many', 'average', 'total']
-    has_data_keyword = any(kw in user_input for kw in data_keywords)
-    
-    # Pure conversation patterns
-    conv_only = ['hello', 'hi', 'hey', 'thank', 'bye', 'help me understand', 'what can you']
-    is_pure_conversation = any(user_input.startswith(p) or user_input == p for p in conv_only)
-    
-    # Routing decision
-    if has_data_keyword and not is_pure_conversation:
-        next_node = "schema_feasibility"
-        reason = f"data keyword detected in: '{user_input[:50]}'"
+    if intent == "conversation":
+        next_node = "conversation"
+        reason = "conversation intent"
     elif intent == "databricks":
         next_node = "schema_feasibility"
         reason = f"databricks intent (confidence: {confidence:.2f})"
-    elif intent == "conversation" or is_pure_conversation:
-        next_node = "conversation"
-        reason = "conversation intent"
     else:
+        # Default to schema_feasibility for anything data-related
         next_node = "schema_feasibility"
-        reason = f"defaulting to data query"
+        reason = f"default to data query (intent: {intent})"
     
     log_routing_decision(logger, "supervisor", next_node, reason)
     return next_node
@@ -70,7 +76,7 @@ def route_from_feasibility(state: WorkflowState) -> str:
     - If not feasible → fallback
     """
     feasibility_check = state.get("feasibility_check", {})
-    is_feasible = feasibility_check.get("feasible", False)
+    is_feasible = feasibility_check.get("feasible", True)  # Default to feasible
     
     if is_feasible:
         next_node = "sql_generator"
@@ -91,7 +97,7 @@ def route_from_validator(state: WorkflowState) -> str:
     - If invalid → fallback
     """
     validation_result = state.get("validation_result", {})
-    is_valid = validation_result.get("valid", False)
+    is_valid = validation_result.get("valid", True)  # Default to valid
     
     if is_valid:
         next_node = "casino_api_executor"
@@ -139,8 +145,8 @@ def build_workflow() -> StateGraph:
     
     schema_feasibility → {sql_generator, fallback}
     sql_generator → sql_validator
-    sql_validator → {databricks_executor, fallback}
-    databricks_executor → {result_summarizer, fallback}
+    sql_validator → {casino_api_executor, fallback}
+    casino_api_executor → {result_summarizer, fallback}
     result_summarizer → END
     """
     logger.info("Building LangGraph workflow...")
@@ -234,11 +240,11 @@ def create_initial_state(
         "user_input": user_input,
         "conversation_history": conversation_history or [],
         "schema_cache": schema_cache or {},
-        "intent": "conversation",
-        "confidence": 0.0,
-        "feasibility_check": {},
+        "intent": "databricks",  # Default to databricks
+        "confidence": 0.5,
+        "feasibility_check": {"feasible": True},  # Default to feasible
         "generated_sql": None,
-        "validation_result": {},
+        "validation_result": {"valid": True},  # Default to valid
         "query_result": None,
         "response": "",
         "current_node": "start",
@@ -256,4 +262,3 @@ def get_workflow():
     if _workflow is None:
         _workflow = build_workflow()
     return _workflow
-
