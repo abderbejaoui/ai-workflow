@@ -107,6 +107,46 @@ class SQLValidator:
         if semicolon_count > 1:
             errors.append("Multiple SQL statements not allowed")
         
+        # Check for GROUP BY / HAVING issues
+        if "GROUP BY" in sql_upper and "HAVING" in sql_upper:
+            group_by_match = re.search(r'\bGROUP\s+BY\s+(.+?)(?:\s+HAVING|\s+ORDER|\s+LIMIT|$)', sql_upper, re.IGNORECASE | re.DOTALL)
+            having_match = re.search(r'\bHAVING\s+(.+?)(?:\s+ORDER|\s+LIMIT|$)', sql_upper, re.IGNORECASE | re.DOTALL)
+            
+            if group_by_match and having_match:
+                group_by_cols = group_by_match.group(1).strip()
+                having_clause = having_match.group(1).strip()
+                
+                # Extract column references from HAVING that are not aggregate functions
+                # Pattern: table.column or column (but not inside SUM(...), COUNT(...), etc.)
+                # Note: Can't use variable-width lookbehind, so we'll use a simpler approach
+                # Just check for common non-aggregated column patterns
+                non_aggregate_cols = []
+                # Look for patterns like: table.column = value or table.column > value
+                col_pattern = r'\b([a-z_]+\.)?(risk_level|age|gender|status|is_active|participation)\b'
+                matches = re.finditer(col_pattern, having_clause, re.IGNORECASE)
+                for match in matches:
+                    # Check if it's not inside an aggregate function by looking backwards
+                    before = having_clause[:match.start()]
+                    if not re.search(r'\b(SUM|COUNT|AVG|MAX|MIN|CAST)\s*\([^)]*$', before, re.IGNORECASE):
+                        non_aggregate_cols.append(match.group(0))
+                
+                # Check if any non-aggregate columns in HAVING are not in GROUP BY
+                for col_match in non_aggregate_cols:
+                    col = col_match[0] if col_match[0] else ""
+                    col_name = col_match[1] if len(col_match) > 1 else ""
+                    if col_name:
+                        full_col = (col + col_name).lower()
+                        # Check if this column is in GROUP BY
+                        if full_col not in group_by_cols.lower() and col_name.lower() not in ['and', 'or', 'not', 'in', 'between', 'like', 'is', 'null']:
+                            # This might be an error, but be lenient - check if it's a common filter column
+                            common_filter_cols = ['risk_level', 'age', 'gender', 'participation', 'status', 'is_active']
+                            if any(filter_col in col_name.lower() for filter_col in common_filter_cols):
+                                errors.append(
+                                    f"Column '{col_name}' in HAVING clause should be in WHERE clause or GROUP BY. "
+                                    f"Non-aggregated columns (like risk_level, age, participation flags) must be filtered in WHERE, not HAVING."
+                                )
+                                break
+        
         # NOTE: We do NOT validate table/column existence here
         # Let the database return meaningful errors instead
         

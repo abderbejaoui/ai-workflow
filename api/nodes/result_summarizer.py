@@ -97,7 +97,7 @@ class ResultSummarizer:
         """Generate a concise summary of the results."""
         
         if not results:
-            return "The query executed successfully but returned no results."
+            return "📊 **Query Results**\n\nThe query executed successfully but returned no results. This means no records match all the specified criteria in your query.\n\n**Suggestions:**\n- Try lowering the thresholds or removing some conditions\n- Check each condition separately to see which ones have data\n- Verify the data exists in the database for those criteria"
         
         # Fast path: For simple "show me" queries, use basic summary
         simple_keywords = ['show', 'list', 'get', 'give', 'display']

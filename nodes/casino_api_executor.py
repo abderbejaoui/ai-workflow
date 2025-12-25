@@ -151,7 +151,7 @@ class CasinoAPIExecutor:
                     # Check if response itself looks like a single result
                     if any(key in response_data for key in ['employee_id', 'customer_id', 'transaction_id', 'session_id']):
                         self.logger.info("Response appears to be a single row, wrapping in list")
-                        data = [response_data]
+                    data = [response_data]
                     else:
                         # If no specific key and not a single row, return empty
                         data = []

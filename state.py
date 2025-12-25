@@ -85,7 +85,7 @@ class SchemaTable:
             return f"{self.schema}.{self.table}"
         else:
             # Full catalog.schema.table naming
-            return f"{self.catalog}.{self.schema}.{self.table}"
+        return f"{self.catalog}.{self.schema}.{self.table}"
 
 
 @dataclass

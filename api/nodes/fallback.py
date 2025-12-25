@@ -50,6 +50,7 @@ class FallbackClarifier:
         conversation_history = state.get("conversation_history", [])
         schema_cache = state.get("schema_cache", {})
         error_message = state.get("error_message", "")
+        generated_sql = state.get("generated_sql", "")
         
         # Determine why we're in fallback
         reason = self._determine_fallback_reason(state)
@@ -58,14 +59,22 @@ class FallbackClarifier:
         if error_message:
             self.logger.warning(f"Error that triggered fallback: {error_message}")
         
-        # Generate appropriate response
-        response = self._generate_clarification(
-            user_input=user_input,
-            reason=reason,
-            error_message=error_message,
-            schema_cache=schema_cache,
-            history=truncate_history(conversation_history, max_messages=2)
-        )
+        # If SQL was generated but there's an error, show the error directly
+        if generated_sql and not generated_sql.startswith("-- Error"):
+            if error_message:
+                response = f"❌ **Query Execution Error**\n\n{error_message}\n\n**Generated SQL:**\n```sql\n{generated_sql}\n```\n\nPlease check the SQL or try rephrasing your question."
+            else:
+                # SQL generated but something else failed
+                response = f"❌ **Query could not be executed**\n\nThe SQL was generated but couldn't be processed.\n\n**Generated SQL:**\n```sql\n{generated_sql}\n```"
+        else:
+            # Generate appropriate response
+            response = self._generate_clarification(
+                user_input=user_input,
+                reason=reason,
+                error_message=error_message,
+                schema_cache=schema_cache,
+                history=truncate_history(conversation_history, max_messages=2)
+            )
         
         updates = {
             "response": response,
@@ -103,57 +112,32 @@ class FallbackClarifier:
     ) -> str:
         """Generate a helpful clarification message."""
         
-        # Build context based on why we're asking for clarification
-        context_info = []
-        
+        # If there's an error message, show it directly instead of asking questions
         if error_message:
-            context_info.append(f"Error encountered: {error_message}")
+            return f"❌ **Error executing query:**\n\n{error_message}\n\nPlease check the SQL query or try rephrasing your question."
         
-        if reason == "infeasible_query":
-            context_info.append("The requested query cannot be fulfilled with available tables.")
+        # If SQL was generated but failed, show that
+        generated_sql = ""  # We don't have access to state here, but we can check if it's a data query
+        if any(kw in user_input.lower() for kw in ['show', 'find', 'list', 'get', 'customer', 'employee', 'transaction', 'region', 'average', 'top']):
+            return f"❌ **Query Execution Failed**\n\nThe query couldn't be executed. This might be due to:\n- Invalid SQL syntax\n- Missing data matching your criteria\n- Database connection issues\n\n**Your query:** {user_input[:100]}...\n\nPlease try rephrasing or simplifying your question."
         
-        # Get available tables for suggestions
-        available_tables = []
-        if schema_cache and "tables" in schema_cache:
-            tables = schema_cache["tables"]
-            available_tables = [t.get("table", "") for t in tables[:10]]
-        
-        if available_tables:
-            context_info.append(f"Available tables: {', '.join(available_tables)}")
-        
-        system_prompt = f"""You are a helpful assistant that asks clarifying questions.
-
-The user's query was unclear or couldn't be processed.
+        # Only ask clarifying questions for truly unclear queries
+        system_prompt = f"""You are a helpful assistant. The user's query was unclear.
 
 Reason: {reason}
 
-Your task:
-1. Ask ONE specific clarifying question, OR
-2. Suggest a rephrased version of their query
-
-Be helpful and guide them toward a successful query.
-
-Context:
-{chr(10).join(context_info) if context_info else 'None'}
-
-Keep your response concise (2-3 sentences)."""
+Provide a brief, helpful response (1-2 sentences) suggesting how to improve the query.
+Do NOT ask multiple questions - just give one clear suggestion."""
         
         try:
             messages = [SystemMessage(content=system_prompt)]
-            
-            # Add minimal history
-            if history:
-                messages.extend(format_conversation_history(history))
-            
-            # Add current query
             messages.append(HumanMessage(content=f"User query: {user_input}"))
             
             response = self.llm.invoke(messages)
             return response.content.strip()
             
         except Exception as e:
-            # Fallback to generic clarification
-            return self._generic_clarification(user_input, available_tables)
+            return f"I'm not quite sure what you're looking for. Could you please be more specific? For example, you could ask about customers, employees, transactions, or game sessions."
     
     def _generic_clarification(self, user_input: str, available_tables: list) -> str:
         """Generate a generic clarification when LLM fails."""

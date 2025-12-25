@@ -158,15 +158,8 @@ class SupervisorNode:
 
 CLASSIFY the user's request into ONE of three categories:
 
-1. **databricks** - ANY query about data, numbers, records, or database tables
-   USE THIS FOR:
-   - "Show me X employees" → databricks
-   - "List customers" → databricks  
-   - "Get transactions" → databricks
-   - "How many..." → databricks
-   - "What is the average..." → databricks
-   - "Find..." → databricks
-   - ANY mention of: employees, customers, transactions, sessions, equipment, shifts, revenue, salary
+1. **databricks** - User wants to query casino data, run analytics, or get insights from tables
+   Examples: "Show me customer data", "What's the total revenue?", "List high-risk customers", "Show employees"
    
    Available tables: employees, customer, customer_behaviors, transactions, game_sessions, gaming_equipment, shifts
 
