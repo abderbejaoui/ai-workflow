@@ -1,44 +1,12 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-venv/
-env/
-ENV/
-
-# Logs
-logs/
-*.log
-
-# Testing
-.pytest_cache/
-test_*.py
-*_test.py
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Documentation
+node_modules
+.next
+package.json
+package-lock.json
+yarn.lock
 *.md
 !README.md
-
-# Local files
+venv
+__pycache__
+*.pyc
 .env
 .env.local
-main.py
-examples.py
-check_setup.py
-validate.py
-visualize.py
-logging_example.py
-test_*.py
-
-# Terminals
-terminals/
-
