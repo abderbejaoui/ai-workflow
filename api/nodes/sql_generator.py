@@ -215,7 +215,8 @@ ORDER BY average_expenditure DESC
 LIMIT 5;
 
 Pattern 4b: WHERE for non-aggregated filters, HAVING for aggregated filters
-"Top 3 regions where customers aged 20-30 have highest expenditure, with both online/offline, at least 5 transactions, and risk_level = 'high'" →
+"Top 3 regions where customers aged 20-30 have highest average monthly gambling expenditure (online + offline), 
+with both online/offline participation, at least 5 transactions, and risk_level = 'high'" →
 SELECT c.region,
        AVG(cb.monthly_gambling_expenditure_offline + cb.monthly_gambling_expenditure_online) AS average_expenditure,
        COUNT(DISTINCT c.customer_id) AS customer_count,
@@ -231,6 +232,14 @@ GROUP BY c.region
 HAVING COUNT(t.transaction_id) >= 5
 ORDER BY average_expenditure DESC
 LIMIT 3;
+
+IMPORTANT COLUMN NOTES:
+- For "average monthly gambling expenditure" use: AVG(cb.monthly_gambling_expenditure_offline + cb.monthly_gambling_expenditure_online)
+- NEVER use "total_expenditure" - this column does NOT exist
+- NEVER use "ft.total_expenditure" - this column does NOT exist  
+- Monthly expenditure columns are in customer_behaviors table (cb), NOT in transactions table (ft/t)
+- The finance_casino.transactions table has: transaction_id, customer_id, transaction_amount, status, direction
+- Use COUNT(t.transaction_id) >= N for "at least N transactions"
 
 Pattern 5: Time-based filtering
 "Employees with highest revenue per shift in last month" →
